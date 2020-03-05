@@ -19,4 +19,8 @@ Complete e2e setup for GKE private cluster with jumphost and all other component
       k8s cluster config enable for accessing cluster from jumphost
       Passing sample k8s app setup files (pods.yaml and service.yaml) into the jump-host using file provisioner
 
+## The Architecture
+
+![The Architecture Flow](https://github.com/yogeshvk1209/gke_private_cluster_e2e/gke.png)
+
 NOTE: Works with terraform version > 12.00 and google-provider version > 3.10
