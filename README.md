@@ -21,6 +21,6 @@ Complete e2e setup for GKE private cluster with jumphost and all other component
 
 ## The Architecture
 
-![The Architecture Flow](https://github.com/yogeshvk1209/gke_private_cluster_e2e/gke.png)
+![The Architecture Flow](https://github.com/yogeshvk1209/gke_private_cluster_e2e/blob/master/gke.png)
 
 NOTE: Works with terraform version > 12.00 and google-provider version > 3.10
