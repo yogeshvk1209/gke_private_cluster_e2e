@@ -21,11 +21,13 @@ Complete e2e setup for GKE private cluster with jumphost and all other component
   - Sampleapp:
       * Contains sample k8s deployment and service yaml files to create and expose a sample app on LB port 8080 (can be accessede on http://<LB_PublicIP:8080>)
 
+
 ## The Architecture
 
 ![The Architecture Flow](https://github.com/yogeshvk1209/gke_private_cluster_e2e/blob/master/gke.png)
 
 
-NOTE: 
+
+P.S.  NOTE: 
 1. Tested and working with terraform version ~> 12.20 and google-provider version ~> 3.10
 2. Few Vars have been left blank ("") and need to filed before terraform apply
