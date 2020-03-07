@@ -9,7 +9,7 @@ provider "google" {
 
 terraform {
  backend "gcs" {
-   bucket  = "ykgcp-terraform-admin"
+   bucket  = ""
    prefix  = "gke/state"
  }
 }

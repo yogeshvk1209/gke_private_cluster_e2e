@@ -1,11 +1,11 @@
 ######## Variables ###########
 
 variable "project" {
-  default = "ykgcp-terraform-admin"
+  default = ""
 }
 
 variable "service_account_email" {
-  default = "946089702358-compute@developer.gserviceaccount.com"
+  default = ""
 }
 
 variable "ssh_user" {
@@ -21,7 +21,7 @@ variable "region" {
 }
 
 variable "cluster_name" {
-  default = "yvk-gke"
+  default = "gke-e2e-demo"
 }
 
 variable "cluster_zone" {
