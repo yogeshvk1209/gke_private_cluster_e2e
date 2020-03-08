@@ -45,7 +45,7 @@ resource "google_compute_instance" "gke-jumphost" {
              timeout = "3m"
              agent = "false"
     }
-  }
+  }    
 
   depends_on = [google_container_node_pool.nodepool0]
 }

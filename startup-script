@@ -11,18 +11,18 @@ cat >> /etc/bashrc <<'EOF'
 ## Adding Steps for kubectl configuration to run kubectl command locally
 if [ -e $HOME/.startupflag ]
 then
-    echo "Kubectl already initialised"
+    echo "Kubectl already initialised" >> $HOME/kubeinstall.log 2>&1 &
 else
     ## Run gloud get-credentials (which gets the k8s certs to local node)
     ## Above command requires cluster_name & cluster_region so that kubectl command setup works with cluster that was setup (Hence run Export command)
-    echo "Kubectl being initialised"
+    echo "Kubectl being initialised" >> $HOME/kubeinstall.log 2>&1 &
     export cluster_name=$(gcloud container clusters list | grep -v NAME | awk '{print $1}')
     export cluster_region=$(gcloud container clusters list | grep -v NAME | awk '{print $2}')
-    gcloud container clusters get-credentials $cluster_name --region $cluster_region
+    gcloud container clusters get-credentials $cluster_name --region $cluster_region >> $HOME/kubeinstall.log 2>&1 &
 
     ## Adding Master Authorised Netowrk CIDR (of local jump-host)
     export localIP=$(gcloud compute instances describe gke-jumphost --zone $cluster_region --format='get(networkInterfaces[0].networkIP)')
-    gcloud container clusters update $cluster_name --region $cluster_region --enable-master-authorized-networks --master-authorized-networks $localIP/32
+    gcloud container clusters update $cluster_name --region $cluster_region --enable-master-authorized-networks --master-authorized-networks $localIP/32 >> $HOME/kubeinstall.log 2>&1 &
 
     touch $HOME/.startupflag
 fi
