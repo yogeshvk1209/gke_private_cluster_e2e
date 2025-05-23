@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: pywebapp
-        image: yogeshvk1209/pyuserwebapp
+        image: yogeshvk1209/pywebapp2025
         ports:
         - containerPort: 8080
         resources:
