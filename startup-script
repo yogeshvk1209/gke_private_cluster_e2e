@@ -1,30 +1,160 @@
 #!/bin/bash
 
-## Installing kubectl binaries (since we are using latest k8s GKE, use stable.txt from googleapis)
-curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
-chmod +x ./kubectl
-mv ./kubectl /usr/local/bin/ /usr/local/sbin/
+# Exit on error, undefined variables, and prevent errors in pipelines
+set -euo pipefail
+IFS=$'\n\t'
 
-## Starting kube init steps
-cat >> /etc/bashrc <<'EOF'
-## Terraform Init Scripts ##
-## Adding Steps for kubectl configuration to run kubectl command locally
-if [ -e $HOME/.startupflag ]
-then
-    echo "Kubectl already initialised" >> $HOME/kubeinstall.log 2>&1 &
-else
-    ## Run gloud get-credentials (which gets the k8s certs to local node)
-    ## Above command requires cluster_name & cluster_region so that kubectl command setup works with cluster that was setup (Hence run Export command)
-    echo "Kubectl being initialised" >> $HOME/kubeinstall.log 2>&1 &
-    export cluster_name=$(gcloud container clusters list | grep -v NAME | awk '{print $1}')
-    export cluster_region=$(gcloud container clusters list | grep -v NAME | awk '{print $2}')
-    gcloud container clusters get-credentials $cluster_name --region $cluster_region >> $HOME/kubeinstall.log 2>&1 &
+# Initialize logging
+readonly LOGFILE="/var/log/gke-startup.log"
+readonly KUBECTL_VERSION="$(curl -s https://dl.k8s.io/release/stable.txt)"
+readonly KUBECTL_CHECKSUM_URL="https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/amd64/kubectl.sha256"
+readonly KUBECTL_URL="https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
+readonly SAMPLE_APP_DIR="/home/centos/sampleapp"
 
-    ## Adding Master Authorised Netowrk CIDR (of local jump-host)
-    export localIP=$(gcloud compute instances describe gke-jumphost --zone $cluster_region --format='get(networkInterfaces[0].networkIP)')
-    gcloud container clusters update $cluster_name --region $cluster_region --enable-master-authorized-networks --master-authorized-networks $localIP/32 >> $HOME/kubeinstall.log 2>&1 &
+# Logging function
+log() {
+    local readonly level="$1"
+    local readonly message="$2"
+    local readonly timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "${timestamp} [${level}] ${message}" >> "${LOGFILE}"
+}
 
-    touch $HOME/.startupflag
-fi
+# Error handling
+error_handler() {
+    local readonly line_no=$1
+    local readonly error_code=$2
+    local readonly last_command="${BASH_COMMAND}"
+    log "ERROR" "Line ${line_no}: '${last_command}' exited with status ${error_code}"
+    exit "${error_code}"
+}
 
-EOF
+trap 'error_handler ${LINENO} $?' ERR
+
+# Function to deploy sample application
+deploy_sample_app() {
+    log "INFO" "Starting sample application deployment..."
+    
+    # Check if the sample app is already deployed
+    if ! kubectl get deployment pywebapp &>/dev/null; then
+        log "INFO" "Deploying sample application..."
+        
+        # Create deployment
+        if ! kubectl apply -f "${SAMPLE_APP_DIR}/pods.yaml"; then
+            log "ERROR" "Failed to deploy sample application pods"
+            return 1
+        fi
+        
+        # Create service
+        if ! kubectl apply -f "${SAMPLE_APP_DIR}/service.yaml"; then
+            log "ERROR" "Failed to deploy sample application service"
+            return 1
+        fi
+        
+        # Wait for deployment to be ready
+        if ! kubectl wait --for=condition=available --timeout=300s deployment/pywebapp; then
+            log "ERROR" "Deployment failed to become ready within timeout"
+            return 1
+        fi
+        
+        # Get service URL
+        local external_ip=""
+        local count=0
+        local max_retries=30
+        
+        log "INFO" "Waiting for LoadBalancer external IP..."
+        while [[ -z "${external_ip}" && "${count}" -lt "${max_retries}" ]]; do
+            external_ip=$(kubectl get service pywebapp -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            if [[ -z "${external_ip}" ]]; then
+                sleep 10
+                ((count++))
+            fi
+        done
+        
+        if [[ -n "${external_ip}" ]]; then
+            log "INFO" "Application is accessible at http://${external_ip}:8080"
+        else
+            log "WARNING" "Timeout waiting for external IP, but deployment is complete"
+        fi
+    else
+        log "INFO" "Sample application is already deployed"
+    fi
+}
+
+main() {
+    log "INFO" "Starting GKE jumphost configuration..."
+
+    # Install kubectl with checksum verification
+    if [[ ! -f "/usr/local/bin/kubectl" ]]; then
+        log "INFO" "Installing kubectl version ${KUBECTL_VERSION}"
+        
+        # Download kubectl and its checksum
+        curl -LO "${KUBECTL_URL}"
+        curl -LO "${KUBECTL_CHECKSUM_URL}"
+        
+        # Verify checksum
+        if ! echo "$(cat kubectl.sha256) kubectl" | sha256sum --check; then
+            log "ERROR" "kubectl binary checksum verification failed"
+            exit 1
+        fi
+        
+        chmod +x ./kubectl
+        mv ./kubectl /usr/local/bin/
+        rm kubectl.sha256
+        log "INFO" "kubectl installation completed"
+    fi
+
+    # Configure kubectl only if not already configured
+    if [[ ! -f "${HOME}/.kube/config" ]]; then
+        log "INFO" "Configuring kubectl..."
+        
+        # Get cluster details with timeout
+        cluster_info=$(timeout 60s gcloud container clusters list --format="csv(name,location)" --limit=1)
+        if [[ -z "${cluster_info}" ]]; then
+            log "ERROR" "Failed to get cluster information"
+            exit 1
+        fi
+        
+        cluster_name=$(echo "${cluster_info}" | cut -d',' -f1)
+        cluster_location=$(echo "${cluster_info}" | cut -d',' -f2)
+        
+        log "INFO" "Found cluster: ${cluster_name} in ${cluster_location}"
+        
+        # Get credentials with timeout
+        if ! timeout 60s gcloud container clusters get-credentials "${cluster_name}" \
+            --location "${cluster_location}" > >(tee -a "${LOGFILE}") 2>&1; then
+            log "ERROR" "Failed to get cluster credentials"
+            exit 1
+        fi
+
+        # Configure master authorized networks
+        local_ip=$(curl -s -H "Metadata-Flavor: Google" \
+            "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip")
+        
+        if [[ -n "${local_ip}" ]]; then
+            log "INFO" "Configuring master authorized networks with IP: ${local_ip}"
+            if ! timeout 60s gcloud container clusters update "${cluster_name}" \
+                --location "${cluster_location}" \
+                --enable-master-authorized-networks \
+                --master-authorized-networks "${local_ip}/32" > >(tee -a "${LOGFILE}") 2>&1; then
+                log "ERROR" "Failed to update master authorized networks"
+                exit 1
+            fi
+        else
+            log "ERROR" "Failed to get instance IP"
+            exit 1
+        fi
+    fi
+
+    # Deploy sample application
+    deploy_sample_app
+
+    log "INFO" "GKE jumphost configuration completed successfully"
+}
+
+# Execute main function
+main
+
+# Cleanup environment variables
+unset KUBECTL_VERSION KUBECTL_CHECKSUM_URL KUBECTL_URL cluster_info cluster_name cluster_location local_ip
+
+exit 0
