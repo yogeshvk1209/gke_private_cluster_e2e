@@ -1,62 +1,118 @@
-
 ############### GKE Cluster Start #####################
 
 data "google_container_engine_versions" "gkeversion" {
-  location           = "us-west1"
-  #version_prefix = var.k8s_version
-  project            = var.project
+  location = var.cluster_zone
+  project = var.project
 }
 
 resource "google_container_cluster" "cluster" {
-  name               = var.cluster_name
+  provider = google-beta
+  name     = var.cluster_name
+  location = var.cluster_zone
+  project  = var.project
 
-## Add location for multi AZ worker nodes
-#location           = var.region
+  # We'll manage the node pool separately
+  remove_default_node_pool = true
+  initial_node_count       = var.initial_node_count
 
-  location           =var.cluster_zone
-  project            = var.project
-  min_master_version = data.google_container_engine_versions.gkeversion.latest_master_version
-  network            = google_compute_network.vpc_net.self_link
-  subnetwork         = google_compute_subnetwork.vpc_subnet.self_link
-  monitoring_service = "monitoring.googleapis.com/kubernetes"
-  logging_service    = "logging.googleapis.com/kubernetes"
-  remove_default_node_pool = "true"
-  initial_node_count       = 1
-
-  ip_allocation_policy{
-    cluster_secondary_range_name = var.cluster_secondary_name
-    services_secondary_range_name = var.cluster_service_name
-  }
-  
-  maintenance_policy {
-    daily_maintenance_window {
-      start_time = "05:00"
-    }
+  # Use release channel for automatic upgrades
+  release_channel {
+    channel = "REGULAR"
   }
 
-  addons_config {
-    http_load_balancing {
-      disabled = false
-    }
+  network    = google_compute_network.vpc_net.self_link
+  subnetwork = google_compute_subnetwork.vpc_subnet.self_link
+
+  # Enable Workload Identity
+  workload_identity_config {
+    workload_pool = "${var.project}.svc.id.goog"
   }
 
+  # Private cluster configuration
   private_cluster_config {
     enable_private_endpoint = true
-    enable_private_nodes = true
+    enable_private_nodes   = true
     master_ipv4_cidr_block = var.master_cidr
+    master_global_access_config {
+      enabled = false
+    }
   }
 
+  # IP allocation policy for VPC-native cluster
+  ip_allocation_policy {
+    cluster_secondary_range_name  = var.cluster_secondary_name
+    services_secondary_range_name = var.cluster_service_name
+  }
+
+  # Security configurations
+  security_posture_config {
+    mode = "BASIC"
+  }
+
+  binary_authorization {
+    evaluation_mode = "PROJECT_SINGLETON_POLICY_ENFORCE"
+  }
+
+  # Enable network policy for pod security
+  network_policy {
+    enabled = true
+    provider = "CALICO"
+  }
+
+  # Master authorized networks
+  master_authorized_networks_config {
+    dynamic "cidr_blocks" {
+      for_each = var.authorized_networks
+      content {
+        cidr_block   = cidr_blocks.value.cidr_block
+        display_name = cidr_blocks.value.display_name
+      }
+    }
+  }
+
+  # Maintenance window
+  maintenance_policy {
+    daily_maintenance_window {
+      start_time = "03:00"
+    }
+  }
+
+  # Logging config only (removed monitoring config)
+  logging_config {
+    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+  }
+
+  resource_labels = {
+    environment = var.environment
+    managed-by  = "terraform"
+  }
+
+  # Disable basic authentication and client certificate
   master_auth {
-     username = ""
-     password = ""
-
-     client_certificate_config {
-       issue_client_certificate = "false"
-     }
+    client_certificate_config {
+      issue_client_certificate = false
+    }
   }
+}
 
-  master_authorized_networks_config {}
+# IAM for Workload Identity
+resource "google_service_account" "gke_sa" {
+  account_id   = "gke-workload-identity-sa"
+  display_name = "GKE Workload Identity Service Account"
+  project      = var.project
+}
 
+resource "google_project_iam_member" "gke_sa_roles" {
+  for_each = toset([
+    "roles/monitoring.viewer",
+    "roles/monitoring.metricWriter",
+    "roles/logging.logWriter",
+    "roles/stackdriver.resourceMetadata.writer"
+  ])
+  
+  project = var.project
+  role    = each.key
+  member  = "serviceAccount:${google_service_account.gke_sa.email}"
 }
 
 ############### GKE Cluster End #####################
@@ -64,15 +120,11 @@ resource "google_container_cluster" "cluster" {
 
 resource "google_container_node_pool" "nodepool0" {
   cluster      = google_container_cluster.cluster.name
-
-##Add location for multi AZ worker nodes
-#location    = var.region
-
   location     = var.cluster_zone
   project      = var.project
   version      = data.google_container_engine_versions.gkeversion.latest_node_version
-  name    = "dev-pool"
-  node_count = var.node_count
+  name         = "dev-pool"
+  node_count   = var.node_count
 
   autoscaling {
     min_node_count = var.autoscaling_min_node_count
@@ -84,7 +136,13 @@ resource "google_container_node_pool" "nodepool0" {
     disk_size_gb = var.disk_size_gb
     disk_type    = var.disk_type
     machine_type = var.machine_type
-    service_account    = var.service_account_email
+    service_account = var.service_account_email
+
+    # Enable Shielded Nodes
+    shielded_instance_config {
+      enable_secure_boot          = true
+      enable_integrity_monitoring = true
+    }
  
     oauth_scopes = [
       "https://www.googleapis.com/auth/devstorage.read_write",
@@ -99,5 +157,4 @@ resource "google_container_node_pool" "nodepool0" {
  
   depends_on = [google_container_cluster.cluster]
 }
-
 ############### GKE Pool End #####################

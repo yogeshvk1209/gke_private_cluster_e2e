@@ -1,33 +1,132 @@
-# Terraform GKE Private cluster with end-to-end setup of all components
+# GKE Private Cluster with Enhanced Security
 
-Complete e2e setup for GKE private cluster with jumphost and all other components setup
+This repository contains Terraform configurations for deploying a secure, private Google Kubernetes Engine (GKE) cluster
 
-## The Setup
+## Architecture
 
-  - CLUSTER: 
-      * Create GKE cluster with 2 modules google_container_cluster and google_container_node_pool. 
-      * Adding lifecycle parameter enable changing node_count, node_config and autoscalling parameters witout triggering cluster destroy-recreate. 
-      * Adding private_cluster_config and related fields to make this a private cluster (enable_private_endpoint = true -> to make end-point also private)
-  - NETWORK: 
-      * Create custom VPC with subnet and secondary ranges (for Pods and service). 
-      * Firewall with SSH rule (with tag = ssh)
-      * Adding Cloud NAT and cloud_router for nodes to connect to internet to download images
-  - COMPUTE: 
-      * Create jump host with ready-to-ssh from terrafom ran host
-      * Kubectl binaries installed
-      * gcloud service account enabled and configured
-      * k8s cluster config enable for accessing cluster from jumphost
-      * Passing sample k8s app setup files (pods.yaml and service.yaml) into the jump-host using file provisioner
-  - Sampleapp:
-      * Contains sample k8s deployment and service yaml files to create and expose a sample app on LB port 8080 (can be accessede on http://<LB_PublicIP:8080>)
+![GKE Private Cluster Architecture](gke.png)
 
+## Features
 
-## The Architecture
+- **Private GKE Cluster**
+  - Private nodes (no public IPs)
+  - Private control plane
+  - Authorized networks for master access
+  - Workload Identity enabled
 
-![The Architecture Flow](https://github.com/yogeshvk1209/gke_private_cluster_e2e/blob/master/gke.png)
+- **Network Security**
+  - Custom VPC with private subnets
+  - Cloud NAT for outbound internet access
+  - VPC Service Controls (optional)
+  - Network Policy enabled with Calico
+  - IAP-based SSH access
 
+- **Security Controls**
+  - Shielded Nodes enabled
+  - Binary Authorization
+  - Workload Identity
+  - Security Command Center integration
+  - Container-Optimized OS
+  - Regular security patches via Release Channel
 
+- **Monitoring & Logging**
+  - Cloud Operations integration
+  - VPC Flow Logs
+  - Cloud Audit Logs
+  - Managed Prometheus
+  - Custom monitoring dashboards
 
-P.S.  NOTE: 
-1. Tested and working with terraform version ~> 12.20 and google-provider version ~> 3.10
-2. Few Vars have been left blank ("") and need to filed before terraform apply
+## Prerequisites
+
+- Terraform >= 1.0
+- Google Cloud SDK
+- Required Google Cloud APIs enabled:
+  - Container API
+  - Compute Engine API
+  - Cloud Resource Manager API
+  - Identity and Access Management API
+  - Cloud KMS API (if using CMEK)
+
+## Required IAM Permissions
+
+The service account or user deploying this infrastructure needs the following roles:
+- `roles/container.admin`
+- `roles/compute.admin`
+- `roles/iam.serviceAccountAdmin`
+- `roles/serviceusage.serviceUsageAdmin`
+- `roles/resourcemanager.projectIamAdmin`
+
+## Usage
+
+1. Initialize Terraform:
+   ```bash
+   terraform init
+   ```
+
+2. Create a `terraform.tfvars` file with your configuration:
+   ```hcl
+   project         = "your-project-id"
+   cluster_name    = "private-gke-cluster"
+   region          = "us-central1"
+   domain          = "yourdomain.com"
+   environment     = "prod"
+   ```
+
+3. Review the plan:
+   ```bash
+   terraform plan
+   ```
+
+4. Apply the configuration:
+   ```bash
+   terraform apply
+   ```
+
+## Accessing the Cluster
+
+To access the cluster, you'll need to:
+
+1. Configure IAP for TCP forwarding:
+   ```bash
+   gcloud compute ssh gke-bastion --tunnel-through-iap
+   ```
+
+2. Configure kubectl:
+   ```bash
+   gcloud container clusters get-credentials private-gke-cluster --region us-central1 --project your-project-id
+   ```
+
+## Security Best Practices
+
+1. **Workload Identity**: Use Workload Identity instead of node service accounts
+2. **Network Policy**: Define network policies for pod-to-pod communication
+3. **Binary Authorization**: Enable Binary Authorization for container image verification
+4. **Regular Updates**: Use Release Channels for automated upgrades
+5. **Access Control**: Implement least privilege access using IAM
+6. **Monitoring**: Enable all security monitoring features
+7. **VPC Service Controls**: Consider enabling VPC Service Controls for additional security
+
+## Maintenance
+
+- The cluster is configured to automatically upgrade using the Regular release channel
+- Maintenance windows are scheduled for weekends
+- Node auto-repair and auto-upgrade are enabled
+- Regular security patches are automatically applied
+
+## Version Compatibility
+
+- Terraform: >= 1.0
+- Google Provider: ~> 5.0
+- GKE: Latest stable version (automatically managed via Release Channel)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details!!! Enjoy!!!

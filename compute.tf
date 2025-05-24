@@ -28,9 +28,9 @@ resource "google_compute_instance" "gke-jumphost" {
   }
 
   metadata = {
-    ssh-keys        = "${var.ssh_user}:${file(var.ssh_pub_key_file)}"
+    ssh-keys        = "${var.ssh_user}:${file(abspath(pathexpand(var.ssh_pub_key_file)))}"
     startup-script  = file("./startup-script")
-    } 
+  } 
 
 ## Copying files for k8s pod and service sample app
   provisioner "file" {
@@ -38,12 +38,12 @@ resource "google_compute_instance" "gke-jumphost" {
     destination = "/home/centos/"
 
     connection {
-             type = "ssh"
-             user = "centos"
-             host = google_compute_instance.gke-jumphost.network_interface.0.access_config.0.nat_ip
-             private_key = file("~/.ssh/id_rsa")
-             timeout = "3m"
-             agent = "false"
+      type        = "ssh"
+      user        = var.ssh_user
+      host        = google_compute_instance.gke-jumphost.network_interface.0.access_config.0.nat_ip
+      private_key = file(abspath(pathexpand(var.ssh_private_key_file)))
+      timeout     = "3m"
+      agent       = false
     }
   }    
 
