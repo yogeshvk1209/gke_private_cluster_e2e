@@ -11,8 +11,9 @@ resource "google_container_cluster" "cluster" {
   location = var.cluster_zone
   project  = var.project
 
-  # Enable Autopilot for fully managed operations
-  enable_autopilot = true
+  # We'll manage the node pool separately
+  remove_default_node_pool = true
+  initial_node_count       = var.initial_node_count
 
   # Use release channel for automatic upgrades
   release_channel {
@@ -58,14 +59,6 @@ resource "google_container_cluster" "cluster" {
     provider = "CALICO"
   }
 
-  # Enable Shielded Nodes
-  node_config {
-    shielded_instance_config {
-      enable_secure_boot          = true
-      enable_integrity_monitoring = true
-    }
-  }
-
   # Master authorized networks
   master_authorized_networks_config {
     dynamic "cidr_blocks" {
@@ -95,12 +88,6 @@ resource "google_container_cluster" "cluster" {
   }
   logging_config {
     enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
-  }
-
-  # Backup configuration
-  backup_config {
-    enabled = true
-    location = "us-west1"
   }
 
   # Additional security settings
@@ -146,15 +133,11 @@ resource "google_project_iam_member" "gke_sa_roles" {
 
 resource "google_container_node_pool" "nodepool0" {
   cluster      = google_container_cluster.cluster.name
-
-##Add location for multi AZ worker nodes
-#location    = var.region
-
   location     = var.cluster_zone
   project      = var.project
   version      = data.google_container_engine_versions.gkeversion.latest_node_version
-  name    = "dev-pool"
-  node_count = var.node_count
+  name         = "dev-pool"
+  node_count   = var.node_count
 
   autoscaling {
     min_node_count = var.autoscaling_min_node_count
@@ -166,7 +149,13 @@ resource "google_container_node_pool" "nodepool0" {
     disk_size_gb = var.disk_size_gb
     disk_type    = var.disk_type
     machine_type = var.machine_type
-    service_account    = var.service_account_email
+    service_account = var.service_account_email
+
+    # Enable Shielded Nodes
+    shielded_instance_config {
+      enable_secure_boot          = true
+      enable_integrity_monitoring = true
+    }
  
     oauth_scopes = [
       "https://www.googleapis.com/auth/devstorage.read_write",
