@@ -18,7 +18,6 @@ cluster_service_range   = "10.2.0.0/16"
 
 # Security settings
 environment = "dev"
-domain = ""  # Set this to your domain (e.g., "yourdomain.com") if you want to use security groups
 
 # VPC Service Controls (optional)
 enable_vpc_sc = false

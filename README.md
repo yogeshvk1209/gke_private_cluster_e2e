@@ -67,7 +67,7 @@ The service account or user deploying this infrastructure needs the following ro
    ```hcl
    project         = "your-project-id"
    cluster_name    = "private-gke-cluster"
-   region          = "us-west1"
+   region          = "us-central1"
    domain          = "yourdomain.com"
    environment     = "prod"
    ```
@@ -93,7 +93,7 @@ To access the cluster, you'll need to:
 
 2. Configure kubectl:
    ```bash
-   gcloud container clusters get-credentials private-gke-cluster --region us-west1 --project your-project-id
+   gcloud container clusters get-credentials private-gke-cluster --region us-central1 --project your-project-id
    ```
 
 ## Security Best Practices

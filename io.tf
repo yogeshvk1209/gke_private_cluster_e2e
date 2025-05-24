@@ -32,7 +32,7 @@ variable "ssh_private_key_file" {
 variable "region" {
   description = "The region where the cluster will be created"
   type        = string
-  default     = "us-west1"
+  default     = "us-central1"
 }
 
 variable "cluster_name" {
@@ -44,7 +44,7 @@ variable "cluster_name" {
 variable "cluster_zone" {
   description = "The zone where the cluster will be created"
   type        = string
-  default     = "us-west1-a"
+  default     = "us-central1-a"
 }
 
 variable "network" {
@@ -146,12 +146,6 @@ variable "environment" {
   description = "Environment (e.g. 'prod', 'staging', 'dev')"
   type        = string
   default     = "dev"
-}
-
-variable "domain" {
-  description = "The domain for the GKE security group"
-  type        = string
-  default     = ""
 }
 
 variable "enable_vpc_sc" {

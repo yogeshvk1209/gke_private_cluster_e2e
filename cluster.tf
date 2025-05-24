@@ -72,30 +72,14 @@ resource "google_container_cluster" "cluster" {
 
   # Maintenance window
   maintenance_policy {
-    recurring_window {
-      start_time = "2024-01-01T05:00:00Z"  # 5 AM UTC
-      end_time   = "2024-01-01T09:00:00Z"  # 9 AM UTC
-      recurrence = "FREQ=WEEKLY;BYDAY=SA,SU"
+    daily_maintenance_window {
+      start_time = "03:00"
     }
   }
 
-  # Monitoring and logging
-  monitoring_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
-    managed_prometheus {
-      enabled = true
-    }
-  }
+  # Logging config only (removed monitoring config)
   logging_config {
     enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
-  }
-
-  # Additional security settings
-  dynamic "authenticator_groups_config" {
-    for_each = var.domain != "" ? [1] : []
-    content {
-      security_group = "gke-security-groups@${var.domain}"
-    }
   }
 
   resource_labels = {
