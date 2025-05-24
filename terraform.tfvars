@@ -2,6 +2,11 @@ project = "your-project-id"
 region  = "us-central1"
 cluster_name = "private-gke-cluster"
 
+# SSH Configuration
+ssh_user = "centos"
+ssh_pub_key_file = "~/.ssh/id_rsa.pub"
+ssh_private_key_file = "~/.ssh/id_rsa"
+
 # Subnet CIDR ranges
 subnetwork_range = "10.0.0.0/24"
 

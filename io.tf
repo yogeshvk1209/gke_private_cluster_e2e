@@ -23,6 +23,12 @@ variable "ssh_pub_key_file" {
   default     = "~/.ssh/id_rsa.pub"
 }
 
+variable "ssh_private_key_file" {
+  description = "Path to the SSH private key file"
+  type        = string
+  default     = "~/.ssh/id_rsa"
+}
+
 variable "region" {
   description = "The region where the cluster will be created"
   type        = string
