@@ -91,8 +91,11 @@ resource "google_container_cluster" "cluster" {
   }
 
   # Additional security settings
-  authenticator_groups_config {
-    security_group = "gke-security-groups@${var.domain}"
+  dynamic "authenticator_groups_config" {
+    for_each = var.domain != "" ? [1] : []
+    content {
+      security_group = "gke-security-groups@${var.domain}"
+    }
   }
 
   resource_labels = {

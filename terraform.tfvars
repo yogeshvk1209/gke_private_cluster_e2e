@@ -16,6 +16,10 @@ cluster_secondary_range = "10.1.0.0/16"
 cluster_service_name   = "gke-services"
 cluster_service_range   = "10.2.0.0/16"
 
+# Security settings
+environment = "dev"
+domain = ""  # Set this to your domain (e.g., "yourdomain.com") if you want to use security groups
+
 # VPC Service Controls (optional)
 enable_vpc_sc = false
 access_policy_name = ""  # Only required if enable_vpc_sc is true 
