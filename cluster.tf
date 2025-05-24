@@ -73,8 +73,8 @@ resource "google_container_cluster" "cluster" {
   # Maintenance window
   maintenance_policy {
     recurring_window {
-      start_time = "05:00"  # 5 AM UTC
-      end_time   = "09:00"  # 9 AM UTC
+      start_time = "2024-01-01T05:00:00Z"  # 5 AM UTC
+      end_time   = "2024-01-01T09:00:00Z"  # 9 AM UTC
       recurrence = "FREQ=WEEKLY;BYDAY=SA,SU"
     }
   }
