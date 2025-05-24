@@ -7,7 +7,7 @@ resource "google_compute_network" "vpc_net" {
 
 resource "google_compute_subnetwork" "vpc_subnet" {
   name          = "${var.cluster_name}-subnet"
-  ip_cidr_range = var.subnet_cidr
+  ip_cidr_range = var.subnetwork_range
   region        = var.region
   project       = var.project
   network       = google_compute_network.vpc_net.self_link
@@ -16,12 +16,12 @@ resource "google_compute_subnetwork" "vpc_subnet" {
 
   secondary_ip_range {
     range_name    = var.cluster_secondary_name
-    ip_cidr_range = var.cluster_secondary_cidr
+    ip_cidr_range = var.cluster_secondary_range
   }
 
   secondary_ip_range {
     range_name    = var.cluster_service_name
-    ip_cidr_range = var.cluster_service_cidr
+    ip_cidr_range = var.cluster_service_range
   }
 
   log_config {
@@ -81,9 +81,9 @@ resource "google_compute_firewall" "allow_internal" {
   }
 
   source_ranges = [
-    var.subnet_cidr,
-    var.cluster_secondary_cidr,
-    var.cluster_service_cidr
+    var.subnetwork_range,
+    var.cluster_secondary_range,
+    var.cluster_service_range
   ]
 }
 
@@ -103,6 +103,20 @@ resource "google_compute_firewall" "allow_ssh_iap" {
 }
 
 # VPC Service Controls (optional)
+resource "google_access_context_manager_access_level" "basic_access" {
+  count = var.enable_vpc_sc ? 1 : 0
+  
+  parent = "accessPolicies/${var.access_policy_name}"
+  name   = "accessPolicies/${var.access_policy_name}/accessLevels/${var.cluster_name}-access-level"
+  title  = "${var.cluster_name}-access-level"
+  
+  basic {
+    conditions {
+      ip_subnetworks = [var.subnetwork_range]
+    }
+  }
+}
+
 resource "google_access_context_manager_service_perimeter" "gke_service_perimeter" {
   count = var.enable_vpc_sc ? 1 : 0
   
@@ -124,7 +138,7 @@ resource "google_access_context_manager_service_perimeter" "gke_service_perimete
     ingress_policies {
       ingress_from {
         sources {
-          access_level = google_access_context_manager_access_level.basic_access.name
+          access_level = google_access_context_manager_access_level.basic_access[0].name
         }
         identity_type = "ANY_IDENTITY"
       }
