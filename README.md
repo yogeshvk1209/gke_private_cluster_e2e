@@ -81,6 +81,10 @@ The service account or user deploying this infrastructure needs the following ro
    ```bash
    terraform apply
    ```
+Or use the monitoring script:
+   ```bash
+   ./monitor_and_destroy.sh
+   ```
 
 ## Accessing the Cluster
 
